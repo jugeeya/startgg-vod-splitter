@@ -1,0 +1,4 @@
+requests>=2.28.0
+tkcalendar>=1.6.0
+# Optional: nicer UI (falls back to standard Tkinter if not installed)
+customtkinter>=5.2.0

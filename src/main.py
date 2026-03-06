@@ -315,11 +315,14 @@ def run_gui():
                     started = vod.format_iso_to_local(s.get("startedAt"))
                     completed = vod.format_iso_to_local(s.get("completedAt"))
                     st = (s.get("station") or {}).get("number")
-                    # Tournament | Match | Round (same order as video title)
-                    title_line = f"{name} | {round_text}" if round_text else name
+                    # [Tournament] Match - Round
                     tournament = tournament_name_var.get().strip()
                     if tournament:
-                        title_line = f"{tournament} | {title_line}"
+                        title_line = f"[{tournament}] {name}"
+                    else:
+                        title_line = name
+                    if round_text:
+                        title_line = f"{title_line} - {round_text}"
                     sets_text.insert("end", f"{i}. {title_line}\n")
                     sets_text.insert("end", f"   started: {started}  completed: {completed}  station: {st}\n\n")
         sets_text.config(state="disabled")

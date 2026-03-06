@@ -83,13 +83,15 @@ def compute_cuts(
     sets: List[dict],
     recording_start: datetime,
     display_name_fn,
+    tournament_name: str = "",
 ) -> List[Tuple[float, float, str]]:
     """
-    Given sets (with startedAt, completedAt) and recording_start (timezone-aware),
+    Given sets (with startedAt, completedAt, fullRoundText) and recording_start (timezone-aware),
     return list of (start_seconds, end_seconds, suggested_filename).
+    Filename format: "Tournament | Player (Char) vs. Player (Char) | fullRoundText"
     """
     out = []
-    for i, s in enumerate(sets):
+    for s in sets:
         started = parse_iso(s.get("startedAt"))
         completed = parse_iso(s.get("completedAt"))
         if started is None or completed is None:
@@ -101,8 +103,10 @@ def compute_cuts(
             completed = completed.replace(tzinfo=timezone.utc)
         start_sec = max(0.0, (started - recording_start).total_seconds())
         end_sec = max(start_sec, (completed - recording_start).total_seconds())
-        label = display_name_fn(s)
-        base = sanitize_filename(f"{label} - Set {i + 1}")
+        match_label = display_name_fn(s)
+        full_round = (s.get("fullRoundText") or "").strip()
+        parts = [p for p in (tournament_name.strip(), match_label, full_round) if p]
+        base = sanitize_filename(" | ".join(parts)) if parts else sanitize_filename(match_label)
         out.append((start_sec, end_sec, base))
     return out
 

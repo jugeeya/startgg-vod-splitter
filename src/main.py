@@ -80,10 +80,25 @@ def run_gui():
     token_entry.pack(side="left", padx=4)
 
     def save_settings():
-        app_config.save_settings(api_token=token_var.get().strip(), event_slug=slug_var.get().strip())
+        app_config.save_settings(
+            api_token=token_var.get().strip(),
+            event_slug=slug_var.get().strip(),
+            tournament_name=tournament_name_var.get().strip(),
+        )
         messagebox.showinfo("Settings", "Settings saved.")
 
     ttk.Button(frame_settings, text="Save settings", command=save_settings).pack(side="left", padx=8)
+
+    # --- Tournament name (used in video titles: "Tournament | Match | Round") ---
+    if HAS_CTK:
+        frame_tournament = ctk.CTkFrame(root, fg_color="transparent")
+    else:
+        frame_tournament = ttk.Frame(root, padding=(12, 2))
+    frame_tournament.pack(fill="x", padx=12, pady=2)
+    ttk.Label(frame_tournament, text="Tournament name:").pack(side="left", padx=(0, 6))
+    tournament_name_var = tk.StringVar(value=app_config.load_settings().get("tournament_name", ""))
+    ttk.Entry(frame_tournament, textvariable=tournament_name_var, width=50).pack(side="left", fill="x", expand=True, padx=4)
+    ttk.Label(frame_tournament, text="(e.g. The Hangout #1)").pack(side="left", padx=4)
 
     # --- Fetch + Station + VOD row ---
     if HAS_CTK:
@@ -259,11 +274,9 @@ def run_gui():
         global recording_start_dt
         recording_start_dt = rec_start
         cuts.clear()
-        cuts.extend(vod.compute_cuts(sets, rec_start, startgg.set_display_name))
+        cuts.extend(vod.compute_cuts(sets, rec_start, startgg.set_display_name, tournament_name_var.get().strip()))
         update_cuts_display()
         status_var.set(f"Computed {len(cuts)} cuts for station {station_val}.")
-
-    ttk.Button(frame_rec, text="Compute cuts", command=compute_cuts).pack(side="left", padx=(12, 0))
 
     # --- Sets from start.gg (what the GraphQL query returned) ---
     if HAS_CTK:
@@ -298,15 +311,27 @@ def run_gui():
             else:
                 for i, s in enumerate(sets_for_station, 1):
                     name = startgg.set_display_name(s)
+                    round_text = (s.get("fullRoundText") or "").strip()
                     started = vod.format_iso_to_local(s.get("startedAt"))
                     completed = vod.format_iso_to_local(s.get("completedAt"))
                     st = (s.get("station") or {}).get("number")
-                    sets_text.insert("end", f"{i}. {name}\n")
+                    # Tournament | Match | Round (same order as video title)
+                    title_line = f"{name} | {round_text}" if round_text else name
+                    tournament = tournament_name_var.get().strip()
+                    if tournament:
+                        title_line = f"{tournament} | {title_line}"
+                    sets_text.insert("end", f"{i}. {title_line}\n")
                     sets_text.insert("end", f"   started: {started}  completed: {completed}  station: {st}\n\n")
         sets_text.config(state="disabled")
 
     # --- Cuts list ---
-    ttk.Label(root, text="Computed cuts (start sec, end sec, filename):").pack(anchor="w", padx=12, pady=(4, 2))
+    if HAS_CTK:
+        frame_cuts_header = ctk.CTkFrame(root, fg_color="transparent")
+    else:
+        frame_cuts_header = ttk.Frame(root, padding=(12, 4))
+    frame_cuts_header.pack(fill="x", padx=12, pady=(4, 2))
+    ttk.Label(frame_cuts_header, text="Computed cuts (start sec, end sec, filename):").pack(side="left", padx=(0, 8))
+    ttk.Button(frame_cuts_header, text="Compute cuts", command=compute_cuts).pack(side="left")
     cuts_text = ScrolledText(root, height=6, width=90, state="disabled", wrap="none", font=("Menlo", 10) if not HAS_CTK else None)
     cuts_text.pack(fill="x", padx=12, pady=4)
     if not HAS_CTK:

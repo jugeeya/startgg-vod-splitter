@@ -1,4 +1,4 @@
-"""Load/save app settings: start.gg API token, last event slug."""
+"""Load/save app settings: start.gg API token, last event slug, tournament name."""
 import json
 import os
 
@@ -12,8 +12,8 @@ def _ensure_config_dir():
 
 
 def load_settings():
-    """Return dict with 'api_token' and 'event_slug' (may be empty)."""
-    defaults = {"api_token": "", "event_slug": ""}
+    """Return dict with 'api_token', 'event_slug', 'tournament_name' (may be empty)."""
+    defaults = {"api_token": "", "event_slug": "", "tournament_name": ""}
     if not os.path.isfile(_CONFIG_FILE):
         return defaults
     try:
@@ -24,7 +24,7 @@ def load_settings():
         return defaults
 
 
-def save_settings(api_token: str = None, event_slug: str = None):
+def save_settings(api_token: str = None, event_slug: str = None, tournament_name: str = None):
     """Update and persist settings. None means leave existing value."""
     _ensure_config_dir()
     current = load_settings()
@@ -32,5 +32,7 @@ def save_settings(api_token: str = None, event_slug: str = None):
         current["api_token"] = api_token
     if event_slug is not None:
         current["event_slug"] = event_slug
+    if tournament_name is not None:
+        current["tournament_name"] = tournament_name
     with open(_CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(current, f, indent=2)

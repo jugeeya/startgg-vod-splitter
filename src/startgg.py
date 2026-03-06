@@ -31,6 +31,7 @@ query EventQuery($slug: String) {
           number
         }
         winnerId
+        fullRoundText
       }
     }
   }
@@ -90,5 +91,5 @@ def set_display_name(set_node: dict) -> str:
         seen.add(key)
         parts.append(f"{entrant} ({character})")
     if len(parts) >= 2:
-        return " vs ".join(parts)
-    return " vs ".join(parts) if parts else f"Set {set_node.get('id', '?')}"
+        return " vs. ".join(parts)
+    return " vs. ".join(parts) if parts else f"Set {set_node.get('id', '?')}"

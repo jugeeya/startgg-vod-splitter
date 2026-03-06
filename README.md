@@ -66,8 +66,23 @@ start.gg returns `startedAt` / `completedAt` in ISO 8601 (usually UTC). The app 
 
 Stored in `config/settings.json` next to the project (API token and last event slug). Keep the token private.
 
+## Building the Windows exe
+
+To build a standalone `.exe` (no Python install needed on the target PC):
+
+1. **Locally (Windows):** Install Python 3.11+, then from the project root:
+   ```bat
+   pip install -r requirements.txt pyinstaller
+   pyinstaller --noconfirm StartGG-VOD-Splitter.spec
+   ```
+   The exe is written to `dist/StartGG-VOD-Splitter.exe`. Copy it (and optionally ffmpeg) to any Windows machine. Settings are stored in a `config` folder next to the exe.
+
+2. **GitHub Actions:** On every push to `main`/`master`, a workflow builds the exe and uploads it as an artifact. In your repo: **Actions** → **Build Windows exe** → select the latest run → **Artifacts** → download **StartGG-VOD-Splitter-Windows** (contains the exe). You can also trigger the workflow manually from the **Actions** tab (**Run workflow**).
+
 ## Project layout
 
+- `run.py` – entry point for PyInstaller (also `python -m src.main`)
+- `StartGG-VOD-Splitter.spec` – PyInstaller spec for the Windows exe
 - `src/main.py` – GUI
 - `src/startgg.py` – start.gg GraphQL client
 - `src/vod.py` – VOD start time and cut list / ffmpeg split

@@ -139,7 +139,7 @@ def split_vod_with_ffmpeg(vod_path: str, cuts: List[Tuple[float, float, str]], o
         duration = end_sec - start_sec
         out_path = os.path.join(output_dir, f"{base_name}.mp4")
         try:
-            subprocess.run(
+            proc = subprocess.run(
                 [
                     "ffmpeg",
                     "-y",
@@ -149,11 +149,19 @@ def split_vod_with_ffmpeg(vod_path: str, cuts: List[Tuple[float, float, str]], o
                     "-c", "copy",
                     out_path,
                 ],
-                check=True,
                 capture_output=True,
                 timeout=600,
             )
-            results.append((True, out_path))
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+            if proc.returncode != 0:
+                err = (proc.stderr or b"").decode("utf-8", errors="replace").strip()
+                err = err.split("\n")[-5:] if err else []  # last few lines often have the real error
+                results.append((False, "\n".join(err) if err else f"ffmpeg exited with code {proc.returncode}"))
+            else:
+                results.append((True, out_path))
+        except FileNotFoundError:
+            results.append((False, "ffmpeg not found. Install ffmpeg and add it to PATH."))
+        except subprocess.TimeoutExpired:
+            results.append((False, "ffmpeg timed out after 10 minutes."))
+        except Exception as e:
             results.append((False, str(e)))
     return results

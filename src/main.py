@@ -355,7 +355,13 @@ def run_gui():
             results = vod.split_vod_with_ffmpeg(vpath, cuts, out_dir)
             ok = sum(1 for r in results if r[0])
             status_var.set(f"Split: {ok}/{len(results)} clips written to {out_dir}")
-            messagebox.showinfo("Split", f"Created {ok} of {len(results)} clips in\n{out_dir}")
+            msg = f"Created {ok} of {len(results)} clips in\n{out_dir}"
+            failures = [(i + 1, r[1]) for i, r in enumerate(results) if not r[0]]
+            if failures:
+                msg += "\n\nErrors:\n" + "\n\n".join(f"Clip {n}: {err}" for n, err in failures)
+                messagebox.showerror("Split (with errors)", msg)
+            else:
+                messagebox.showinfo("Split", msg)
         except Exception as e:
             status_var.set("Split error: " + str(e))
             messagebox.showerror("Split error", str(e))

@@ -20,15 +20,12 @@ If that formula doesn’t exist, install `tcl-tk` and reinstall Python: `brew in
    ```
    Minimum: `pip install requests`. The app will use standard Tkinter. Install `customtkinter` as well for a darker, modern look.
 
-2. **Get a start.gg API token**  
-   [start.gg Developer Portal](https://developer.start.gg/) → create an app or use personal token → copy the token. Paste it in the app and click **Save settings**.
-
-3. **Run the app**
+2. **Run the app**
    - **macOS / Linux:** From project root, `python3 -m src.main` (or `./run.sh`).
    - **Windows:** From project root in Command Prompt or PowerShell: `py -3 -m src.main` or `python -m src.main`. Or double‑click `run.bat` (after installing Python and dependencies).
 
-4. **Workflow**
-   - Enter **event slug** (e.g. `tournament/joshu-s-test-tourney/event/rivals-of-aether-ii-singles`) and **Save settings**.
+3. **Workflow**
+   - Enter **event slug** (e.g. `tournament/joshu-s-test-tourney/event/rivals-of-aether-ii-singles`). (No API token needed — the app uses the same public endpoint as the start.gg site.)
    - Click **Fetch sets** to load the event from start.gg.
    - Choose **Station** (the station number for this VOD).
    - Click **Choose VOD…** and select your full recording file.
@@ -62,10 +59,6 @@ Output clips are written as `.mp4` (stream copy, no re-encode) in the folder you
 
 start.gg returns `startedAt` / `completedAt` in ISO 8601 (usually UTC). The app treats your **recording start** as the same timezone (or UTC). If you use **Use file time**, the file’s creation time is interpreted as UTC. If your recording PC uses local time, set **Recording start** manually to the correct UTC time (or same zone as the API) so cuts line up.
 
-## Settings
-
-Stored in `config/settings.json` next to the project (API token and last event slug). Keep the token private.
-
 ## Building the Windows exe
 
 To build a standalone `.exe` (no Python install needed on the target PC):
@@ -75,7 +68,7 @@ To build a standalone `.exe` (no Python install needed on the target PC):
    pip install -r requirements.txt pyinstaller
    pyinstaller --noconfirm StartGG-VOD-Splitter.spec
    ```
-   The exe is written to `dist/StartGG-VOD-Splitter.exe`. Copy it (and optionally ffmpeg) to any Windows machine. Settings are stored in a `config` folder next to the exe.
+   The exe is written to `dist/StartGG-VOD-Splitter.exe`. Copy it (and optionally ffmpeg) to any Windows machine.
 
 2. **GitHub Actions:** On every push to `main`/`master`, a workflow builds the exe and uploads it as an artifact. In your repo: **Actions** → **Build Windows exe** → select the latest run → **Artifacts** → download **StartGG-VOD-Splitter-Windows** (contains the exe). You can also trigger the workflow manually from the **Actions** tab (**Run workflow**).
 
@@ -86,7 +79,6 @@ To build a standalone `.exe` (no Python install needed on the target PC):
 - `src/main.py` – GUI
 - `src/startgg.py` – start.gg GraphQL client
 - `src/vod.py` – VOD start time and cut list / ffmpeg split
-- `src/config.py` – load/save settings
 - `PLAN.md` – design and scope
 
 ## License

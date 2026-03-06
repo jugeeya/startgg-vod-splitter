@@ -20,7 +20,6 @@ try:
 except ImportError:
     HAS_CALENDAR = False
 
-from . import config as app_config
 from . import startgg
 from . import vod
 
@@ -70,24 +69,9 @@ def run_gui():
     frame_settings.pack(fill="x", padx=12, pady=8)
 
     ttk.Label(frame_settings, text="Event slug:").pack(side="left", padx=(0, 6))
-    slug_var = tk.StringVar(value=app_config.load_settings().get("event_slug", ""))
+    slug_var = tk.StringVar(value="")
     slug_entry = ttk.Entry(frame_settings, textvariable=slug_var, width=55)
     slug_entry.pack(side="left", fill="x", expand=True, padx=4)
-
-    ttk.Label(frame_settings, text="API token:").pack(side="left", padx=(12, 4))
-    token_var = tk.StringVar(value=app_config.load_settings().get("api_token", ""))
-    token_entry = ttk.Entry(frame_settings, textvariable=token_var, width=24, show="*")
-    token_entry.pack(side="left", padx=4)
-
-    def save_settings():
-        app_config.save_settings(
-            api_token=token_var.get().strip(),
-            event_slug=slug_var.get().strip(),
-            tournament_name=tournament_name_var.get().strip(),
-        )
-        messagebox.showinfo("Settings", "Settings saved.")
-
-    ttk.Button(frame_settings, text="Save settings", command=save_settings).pack(side="left", padx=8)
 
     # --- Tournament name (used in video titles: "Tournament | Match | Round") ---
     if HAS_CTK:
@@ -96,7 +80,7 @@ def run_gui():
         frame_tournament = ttk.Frame(root, padding=(12, 2))
     frame_tournament.pack(fill="x", padx=12, pady=2)
     ttk.Label(frame_tournament, text="Tournament name:").pack(side="left", padx=(0, 6))
-    tournament_name_var = tk.StringVar(value=app_config.load_settings().get("tournament_name", ""))
+    tournament_name_var = tk.StringVar(value="")
     ttk.Entry(frame_tournament, textvariable=tournament_name_var, width=50).pack(side="left", fill="x", expand=True, padx=4)
     ttk.Label(frame_tournament, text="(e.g. The Hangout #1)").pack(side="left", padx=4)
 
@@ -107,18 +91,17 @@ def run_gui():
         frame_fetch = ttk.Frame(root, padding=(12, 6))
     frame_fetch.pack(fill="x", padx=12, pady=6)
 
-    status_var = tk.StringVar(value="Enter slug and token, then Fetch sets.")
+    status_var = tk.StringVar(value="Enter event slug, then Fetch sets.")
 
     def fetch_sets():
         slug = slug_var.get().strip()
-        token = token_var.get().strip()
-        if not slug or not token:
-            status_var.set("Please set event slug and API token.")
+        if not slug:
+            status_var.set("Please enter event slug.")
             return
         status_var.set("Fetching...")
         root.update_idletasks()
         try:
-            data = startgg.fetch_event_sets(slug, token)
+            data = startgg.fetch_event_sets(slug)
             event_data["raw"] = data
             stations = set()
             for n in (data.get("event") or {}).get("sets", {}).get("nodes") or []:
@@ -302,7 +285,7 @@ def run_gui():
             station_num = None
         if event_data["raw"] is None:
             sets_label_var.set("Sets from start.gg — fetch event first")
-            sets_text.insert("end", "Enter slug and API token, then click Fetch sets.")
+            sets_text.insert("end", "Enter event slug, then click Fetch sets.")
         else:
             sets_label_var.set(f"Sets from start.gg — station {station_val or 'all'}")
             sets_for_station = startgg.get_sets_by_station(event_data["raw"], station_num)
@@ -412,7 +395,7 @@ def run_gui():
     # --- Status ---
     ttk.Label(root, textvariable=status_var, foreground="gray").pack(anchor="w", padx=12, pady=(0, 8))
 
-    # Load saved slug/token already set in vars
+    # Load saved slug already set in vars
     root.mainloop()
 
 

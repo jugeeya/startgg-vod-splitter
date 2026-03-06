@@ -1,10 +1,14 @@
 """
 start.gg GraphQL client: fetch event sets and filter by station.
+Uses the same unauthenticated endpoint as the start.gg website (no API token).
 """
 import requests
 from typing import List, Optional, Any
 
-API_URL = "https://api.start.gg/gql/alpha"
+# Same endpoint the start.gg site uses; no auth required
+API_URL = "https://www.start.gg/api/-/gql"
+
+REQUEST_TIMEOUT = 20.0
 
 EVENT_SETS_QUERY = """
 query EventQuery($slug: String) {
@@ -39,21 +43,33 @@ query EventQuery($slug: String) {
 """
 
 
-def fetch_event_sets(slug: str, api_token: str) -> dict:
+def fetch_event_sets(slug: str) -> dict:
     """
-    Fetch event and its sets from start.gg.
+    Fetch event and its sets from start.gg (no API token).
     Returns the raw 'data' dict or raises on error.
     """
-    headers = {"Authorization": f"Bearer {api_token}", "Content-Type": "application/json"}
-    payload = {"query": EVENT_SETS_QUERY, "variables": {"slug": slug}}
-    r = requests.post(API_URL, json=payload, headers=headers, timeout=30)
-    r.raise_for_status()
-    out = r.json()
-    if "errors" in out and out["errors"]:
-        raise RuntimeError("GraphQL errors: " + str(out["errors"]))
-    if "data" not in out or not out["data"] or "event" not in out["data"]:
-        raise RuntimeError("No event in response. Check slug and API token.")
-    return out["data"]
+    headers = {
+        "Content-Type": "application/json",
+        "client-version": "20",
+        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36",
+    }
+    payload = {
+        "operationName": "EventQuery",
+        "variables": {"slug": slug},
+        "query": EVENT_SETS_QUERY,
+    }
+    last_error = None
+    for _ in range(5):
+        r = requests.post(API_URL, json=payload, headers=headers, timeout=REQUEST_TIMEOUT)
+        if r.status_code == 200:
+            out = r.json()
+            if "errors" in out and out["errors"]:
+                raise RuntimeError("GraphQL errors: " + str(out["errors"]))
+            if "data" not in out or not out["data"] or "event" not in out["data"]:
+                raise RuntimeError("No event in response. Check event slug.")
+            return out["data"]
+        last_error = r
+    raise RuntimeError(f"Request failed after retries (last status {last_error.status_code}). Check event slug.")
 
 
 def get_sets_by_station(data: dict, station_number: Optional[int]) -> List[dict]:

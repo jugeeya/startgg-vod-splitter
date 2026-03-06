@@ -23,9 +23,9 @@ def format_iso_to_local(iso_str: Optional[str], fmt: str = "%Y-%m-%d %I:%M:%S %p
     return local.strftime(fmt)
 
 
-def utc_from_local(year: int, month: int, day: int, hour: int, minute: int) -> datetime:
-    """Build a UTC datetime from local date/time (e.g. from date picker)."""
-    local = datetime(year, month, day, hour, minute, 0, tzinfo=_local_tz())
+def utc_from_local(year: int, month: int, day: int, hour: int, minute: int, second: int = 0) -> datetime:
+    """Build a UTC datetime from local date/time (e.g. from date picker), to the second."""
+    local = datetime(year, month, day, hour, minute, second, tzinfo=_local_tz())
     return local.astimezone(timezone.utc)
 
 
@@ -70,13 +70,13 @@ def get_vod_start_from_file(path: str) -> Optional[datetime]:
         return None
 
 
-def get_vod_start_from_file_local(path: str) -> Optional[Tuple[int, int, int, int, int]]:
-    """Return (year, month, day, hour, minute) in local time for the file's creation time."""
+def get_vod_start_from_file_local(path: str) -> Optional[Tuple[int, int, int, int, int, int]]:
+    """Return (year, month, day, hour, minute, second) in local time for the file's creation time."""
     dt = get_vod_start_from_file(path)
     if dt is None:
         return None
     local = dt.astimezone(_local_tz())
-    return (local.year, local.month, local.day, local.hour, local.minute)
+    return (local.year, local.month, local.day, local.hour, local.minute, local.second)
 
 
 def compute_cuts(

@@ -160,6 +160,7 @@ def run_gui():
     ttk.Label(frame_rec, text="Recording start (local):").pack(side="left", padx=(0, 6))
     rec_hour_var = tk.StringVar(value="12")
     rec_minute_var = tk.StringVar(value="0")
+    rec_second_var = tk.StringVar(value="0")
     rec_start_fallback_var = tk.StringVar()  # used when HAS_CALENDAR is False
 
     if HAS_CALENDAR:
@@ -168,9 +169,9 @@ def run_gui():
         rec_date_entry = DateEntry(frame_rec, width=12, year=_today.year, month=_today.month, day=_today.day)
         rec_date_entry.pack(side="left", padx=2)
     else:
-        rec_date_entry = ttk.Entry(frame_rec, textvariable=rec_start_fallback_var, width=20)
+        rec_date_entry = ttk.Entry(frame_rec, textvariable=rec_start_fallback_var, width=22)
         rec_date_entry.pack(side="left", padx=2)
-        ttk.Label(frame_rec, text="(YYYY-MM-DD HH:MM)").pack(side="left", padx=2)
+        ttk.Label(frame_rec, text="(YYYY-MM-DD HH:MM:SS)").pack(side="left", padx=2)
 
     ttk.Label(frame_rec, text="Time:").pack(side="left", padx=(8, 2))
     hour_spin = ttk.Spinbox(frame_rec, from_=0, to=23, width=3, textvariable=rec_hour_var)
@@ -178,6 +179,9 @@ def run_gui():
     ttk.Label(frame_rec, text=":").pack(side="left")
     min_spin = ttk.Spinbox(frame_rec, from_=0, to=59, width=3, textvariable=rec_minute_var)
     min_spin.pack(side="left", padx=2)
+    ttk.Label(frame_rec, text=":").pack(side="left")
+    sec_spin = ttk.Spinbox(frame_rec, from_=0, to=59, width=3, textvariable=rec_second_var)
+    sec_spin.pack(side="left", padx=2)
 
     def auto_fill_recording_start():
         path = vod_path_var.get().strip()
@@ -186,13 +190,14 @@ def run_gui():
         tup = vod.get_vod_start_from_file_local(path)
         if not tup:
             return
-        y, mo, d, h, mi = tup
+        y, mo, d, h, mi, sec = tup
         rec_hour_var.set(str(h))
         rec_minute_var.set(str(mi))
+        rec_second_var.set(str(sec))
         if HAS_CALENDAR:
             rec_date_entry.set_date(__import__("datetime").date(y, mo, d))
         else:
-            rec_start_fallback_var.set(f"{y:04d}-{mo:02d}-{d:02d} {h:02d}:{mi:02d}")
+            rec_start_fallback_var.set(f"{y:04d}-{mo:02d}-{d:02d} {h:02d}:{mi:02d}:{sec:02d}")
 
     ttk.Button(frame_rec, text="Use file time", command=auto_fill_recording_start).pack(side="left", padx=(10, 4))
 
@@ -204,8 +209,9 @@ def run_gui():
                 d = rec_date_entry.get_date()
                 h = int(rec_hour_var.get())
                 mi = int(rec_minute_var.get())
-                if 0 <= h <= 23 and 0 <= mi <= 59:
-                    return vod.utc_from_local(d.year, d.month, d.day, h, mi)
+                sec = int(rec_second_var.get())
+                if 0 <= h <= 23 and 0 <= mi <= 59 and 0 <= sec <= 59:
+                    return vod.utc_from_local(d.year, d.month, d.day, h, mi, sec)
             except (ValueError, TypeError):
                 pass
             if path:
@@ -218,8 +224,13 @@ def run_gui():
                 if dt is None:
                     try:
                         from datetime import datetime
-                        dt_naive = datetime.strptime(override[:16], "%Y-%m-%d %H:%M")
-                        return vod.utc_from_local(dt_naive.year, dt_naive.month, dt_naive.day, dt_naive.hour, dt_naive.minute)
+                        s = override.strip()
+                        if len(s) >= 19:
+                            dt_naive = datetime.strptime(s[:19], "%Y-%m-%d %H:%M:%S")
+                        else:
+                            dt_naive = datetime.strptime(s[:16], "%Y-%m-%d %H:%M")
+                        sec = getattr(dt_naive, "second", 0)
+                        return vod.utc_from_local(dt_naive.year, dt_naive.month, dt_naive.day, dt_naive.hour, dt_naive.minute, sec)
                     except ValueError:
                         pass
                 if dt and dt.tzinfo is None:

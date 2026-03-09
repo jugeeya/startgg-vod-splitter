@@ -1,6 +1,10 @@
 """
 start.gg GraphQL client: fetch event sets and filter by station.
 Uses the same unauthenticated endpoint as the start.gg website (no API token).
+
+Note: completedAt can be updated when a set is edited later (e.g. character corrections).
+The API does not expose a separate "actual" completion time, so the app shows duration
+per set and warns when it exceeds 45 minutes so you can fix the end time manually.
 """
 import requests
 from typing import List, Optional, Any

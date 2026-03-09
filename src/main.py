@@ -30,11 +30,13 @@ def run_gui():
         # ctk.set_default_color_theme("blue")
         root = ctk.CTk()
         root.title("Start.gg VOD Splitter")
-        root.minsize(720, 640)
+        root.minsize(1150, 640)
+        root.geometry("1200x800")
     else:
         root = tk.Tk()
         root.title("Start.gg VOD Splitter")
-        root.minsize(720, 640)
+        root.minsize(1150, 640)
+        root.geometry("1200x800")
         root.configure(bg="#e8e8e8")
         style = ttk.Style()
         if "clam" in style.theme_names():
@@ -239,29 +241,40 @@ def run_gui():
                 return vod.get_vod_start_from_file(path)
             return None
 
+    # State for editable sets list: list of (set_node, check_var, title_var)
+    sets_ui_rows = []
+
     def compute_cuts():
-        station_val = station_combo.get()
-        try:
-            station_num = int(station_val) if station_val else None
-        except ValueError:
-            station_num = None
-        if event_data["raw"] is None:
-            status_var.set("Fetch sets first.")
+        if not sets_ui_rows:
+            status_var.set("Fetch sets first and ensure at least one set is checked.")
             return
-        sets = startgg.get_sets_by_station(event_data["raw"], station_num)
-        event_data["sets"] = sets
         rec_start = get_recording_start()
         if rec_start is None:
             status_var.set("Set VOD path and/or recording start (or click Use file time).")
             return
+        selection = []
+        for row_data in sets_ui_rows:
+            set_node, check_var, title_var = row_data[0], row_data[1], row_data[2]
+            if not check_var.get():
+                continue
+            title = title_var.get().strip() or startgg.set_display_name(set_node)
+            start_ymdhm = get_ymdhm(row_data[3], row_data[4], row_data[5])
+            end_ymdhm = get_ymdhm(row_data[6], row_data[7], row_data[8])
+            if start_ymdhm is not None and end_ymdhm is not None:
+                selection.append((set_node, title, start_ymdhm, end_ymdhm))
+            else:
+                selection.append((set_node, title, None, None))
+        if not selection:
+            status_var.set("Check at least one set to include.")
+            return
         global recording_start_dt
         recording_start_dt = rec_start
         cuts.clear()
-        cuts.extend(vod.compute_cuts(sets, rec_start, startgg.set_display_name, tournament_name_var.get().strip()))
+        cuts.extend(vod.compute_cuts_from_selection(selection, rec_start))
         update_cuts_display()
-        status_var.set(f"Computed {len(cuts)} cuts for station {station_val}.")
+        status_var.set(f"Computed {len(cuts)} cuts from {len(selection)} selected set(s).")
 
-    # --- Sets from start.gg (what the GraphQL query returned) ---
+    # --- Sets from start.gg: editable rows with checkboxes ---
     if HAS_CTK:
         frame_sets = ctk.CTkFrame(root, fg_color="transparent")
     else:
@@ -269,15 +282,90 @@ def run_gui():
     frame_sets.pack(fill="both", expand=True, padx=12, pady=4)
 
     sets_label_var = tk.StringVar(value="Sets from start.gg (fetch event and pick station)")
-    ttk.Label(frame_sets, textvariable=sets_label_var).pack(anchor="w")
-    sets_text = ScrolledText(frame_sets, height=8, width=90, state="disabled", wrap="none", font=("Menlo", 10) if not HAS_CTK else None)
-    sets_text.pack(fill="both", expand=True, pady=(2, 6))
+    sets_header_row = ttk.Frame(frame_sets)
+    sets_header_row.pack(fill="x")
+    ttk.Label(sets_header_row, textvariable=sets_label_var).pack(side="left")
+
+    DURATION_WARN_MINUTES = 45
+
+    def get_ymdhm(date_widget, h_var, m_var):
+        try:
+            if hasattr(date_widget, "get_date"):
+                d = date_widget.get_date()
+                y, mo, day = d.year, d.month, d.day
+            else:
+                # Plain Entry (used in set rows): .get() returns the date string
+                s = (date_widget.get() or "").strip()[:10]
+                if len(s) < 10:
+                    return None
+                from datetime import datetime
+                dt = datetime.strptime(s, "%Y-%m-%d")
+                y, mo, day = dt.year, dt.month, dt.day
+            h, mi = int(h_var.get()), int(m_var.get())
+            if 0 <= h <= 23 and 0 <= mi <= 59:
+                return (y, mo, day, h, mi)
+        except (ValueError, TypeError, AttributeError):
+            pass
+        return None
+
+    def update_durations():
+        from datetime import datetime
+        for row_data in sets_ui_rows:
+            try:
+                if len(row_data) < 11:
+                    continue
+                start_ymdhm = get_ymdhm(row_data[3], row_data[4], row_data[5])
+                end_ymdhm = get_ymdhm(row_data[6], row_data[7], row_data[8])
+                duration_label = row_data[9]
+                warn_label = row_data[10]
+                if start_ymdhm is None or end_ymdhm is None:
+                    duration_label.config(text="")
+                    warn_label.config(text="")
+                    continue
+                start_dt = datetime(*start_ymdhm)
+                end_dt = datetime(*end_ymdhm)
+                if end_dt <= start_dt:
+                    duration_label.config(text="(invalid)")
+                    warn_label.config(text="")
+                    continue
+                delta = end_dt - start_dt
+                total_sec = int(delta.total_seconds())
+                mins, secs = divmod(total_sec, 60)
+                duration_label.config(text=f"Duration: {mins}:{secs:02d}")
+                if total_sec > DURATION_WARN_MINUTES * 60:
+                    warn_label.config(text=" — Set too long; may have incorrect end time", foreground="red")
+                else:
+                    warn_label.config(text="", foreground="red")
+            except Exception:
+                if len(row_data) >= 11:
+                    row_data[9].config(text="(error)")
+                    row_data[10].config(text="")
+
+    ttk.Button(sets_header_row, text="Refresh durations", command=update_durations).pack(side="left", padx=(12, 0))
+
+    # Scrollable container for set rows (vertical + horizontal so duration column is visible)
+    sets_canvas = tk.Canvas(frame_sets, highlightthickness=0)
+    sets_vscroll = ttk.Scrollbar(frame_sets, orient="vertical", command=sets_canvas.yview)
+    sets_hscroll = ttk.Scrollbar(frame_sets, orient="horizontal", command=sets_canvas.xview)
+    sets_inner = ttk.Frame(sets_canvas)
+    sets_inner.bind("<Configure>", lambda e: sets_canvas.configure(scrollregion=sets_canvas.bbox("all")))
+    sets_canvas_window_id = sets_canvas.create_window((0, 0), window=sets_inner, anchor="nw")
+    sets_canvas.configure(yscrollcommand=sets_vscroll.set, xscrollcommand=sets_hscroll.set)
+
+    def _on_frame_configure(event):
+        sets_canvas.configure(scrollregion=sets_canvas.bbox("all"))
+
+    sets_inner.bind("<Configure>", _on_frame_configure)
+    sets_canvas.pack(side="left", fill="both", expand=True, pady=(2, 0))
+    sets_vscroll.pack(side="right", fill="y")
+    sets_hscroll.pack(side="bottom", fill="x", pady=(2, 0))
     if not HAS_CTK:
-        sets_text.configure(bg="#fff", relief="flat", borderwidth=1)
+        sets_canvas.configure(bg="#fff")
 
     def update_sets_display():
-        sets_text.config(state="normal")
-        sets_text.delete("1.0", "end")
+        for w in sets_inner.winfo_children():
+            w.destroy()
+        sets_ui_rows.clear()
         station_val = station_combo.get()
         try:
             station_num = int(station_val) if station_val else None
@@ -285,30 +373,78 @@ def run_gui():
             station_num = None
         if event_data["raw"] is None:
             sets_label_var.set("Sets from start.gg — fetch event first")
-            sets_text.insert("end", "Enter event slug, then click Fetch sets.")
-        else:
-            sets_label_var.set(f"Sets from start.gg — station {station_val or 'all'}")
-            sets_for_station = startgg.get_sets_by_station(event_data["raw"], station_num)
-            if not sets_for_station:
-                sets_text.insert("end", f"No sets with startedAt/completedAt for station {station_val or 'all'}.")
+            ttk.Label(sets_inner, text="Enter event slug, then click Fetch sets.", foreground="gray").pack(anchor="w")
+            return
+        sets_label_var.set(f"Sets from start.gg — station {station_val or 'all'} (check sets to include, edit titles)")
+        sets_for_station = startgg.get_sets_by_station(event_data["raw"], station_num)
+        if not sets_for_station:
+            ttk.Label(sets_inner, text=f"No sets with startedAt/completedAt for station {station_val or 'all'}.", foreground="gray").pack(anchor="w")
+            return
+        from datetime import date
+        for s in sets_for_station:
+            name = startgg.set_display_name(s)
+            round_text = (s.get("fullRoundText") or "").strip()
+            tournament = tournament_name_var.get().strip()
+            if tournament:
+                default_title = f"[{tournament}] {name}"
             else:
-                for i, s in enumerate(sets_for_station, 1):
-                    name = startgg.set_display_name(s)
-                    round_text = (s.get("fullRoundText") or "").strip()
-                    started = vod.format_iso_to_local(s.get("startedAt"))
-                    completed = vod.format_iso_to_local(s.get("completedAt"))
-                    st = (s.get("station") or {}).get("number")
-                    # [Tournament] Match - Round
-                    tournament = tournament_name_var.get().strip()
-                    if tournament:
-                        title_line = f"[{tournament}] {name}"
-                    else:
-                        title_line = name
-                    if round_text:
-                        title_line = f"{title_line} - {round_text}"
-                    sets_text.insert("end", f"{i}. {title_line}\n")
-                    sets_text.insert("end", f"   started: {started}  completed: {completed}  station: {st}\n\n")
-        sets_text.config(state="disabled")
+                default_title = name
+            if round_text:
+                default_title = f"{default_title} - {round_text}"
+            check_var = tk.BooleanVar(value=True)
+            title_var = tk.StringVar(value=default_title)
+            start_ymdhm, end_ymdhm = vod.get_set_start_end_local(s)
+            if start_ymdhm:
+                sy, smo, sd, sh, smi = start_ymdhm
+                start_date_default = date(sy, smo, sd)
+                start_h_var = tk.StringVar(value=str(sh))
+                start_m_var = tk.StringVar(value=str(smi))
+            else:
+                start_date_default = date.today()
+                start_h_var = tk.StringVar(value="0")
+                start_m_var = tk.StringVar(value="0")
+            if end_ymdhm:
+                ey, emo, ed, eh, emi = end_ymdhm
+                end_date_default = date(ey, emo, ed)
+                end_h_var = tk.StringVar(value=str(eh))
+                end_m_var = tk.StringVar(value=str(emi))
+            else:
+                end_date_default = date.today()
+                end_h_var = tk.StringVar(value="0")
+                end_m_var = tk.StringVar(value="0")
+            row = ttk.Frame(sets_inner)
+            row.pack(fill="x", pady=2)
+            cb = ttk.Checkbutton(row, variable=check_var)
+            cb.pack(side="left", padx=(0, 6))
+            ent = ttk.Entry(row, textvariable=title_var, width=38)
+            ent.pack(side="left", padx=(0, 6))
+            # Use plain Entry for dates in the scrollable list — DateEntry's dropdown freezes inside a Canvas
+            start_date_str = start_date_default.strftime("%Y-%m-%d")
+            end_date_str = end_date_default.strftime("%Y-%m-%d")
+            ttk.Label(row, text="Start:").pack(side="left", padx=(0, 2))
+            start_date_entry = ttk.Entry(row, width=10)
+            start_date_entry.insert(0, start_date_str)
+            start_date_entry.pack(side="left", padx=2)
+            start_h_spin = ttk.Spinbox(row, from_=0, to=23, width=2, textvariable=start_h_var)
+            start_h_spin.pack(side="left", padx=1)
+            ttk.Label(row, text=":").pack(side="left")
+            start_m_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=start_m_var)
+            start_m_spin.pack(side="left", padx=1)
+            ttk.Label(row, text="End:").pack(side="left", padx=(4, 2))
+            end_date_entry = ttk.Entry(row, width=10)
+            end_date_entry.insert(0, end_date_str)
+            end_date_entry.pack(side="left", padx=2)
+            end_h_spin = ttk.Spinbox(row, from_=0, to=23, width=2, textvariable=end_h_var)
+            end_h_spin.pack(side="left", padx=1)
+            ttk.Label(row, text=":").pack(side="left")
+            end_m_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=end_m_var)
+            end_m_spin.pack(side="left", padx=1)
+            duration_label = ttk.Label(row, text="")
+            duration_label.pack(side="left", padx=(8, 2))
+            warn_label = ttk.Label(row, text="", foreground="red")
+            warn_label.pack(side="left", padx=2)
+            sets_ui_rows.append((s, check_var, title_var, start_date_entry, start_h_var, start_m_var, end_date_entry, end_h_var, end_m_var, duration_label, warn_label))
+        update_durations()
 
     # --- Cuts list ---
     if HAS_CTK:

@@ -117,6 +117,71 @@ def compute_cuts(
     return out
 
 
+# (year, month, day, hour, minute) in local time
+YMDHM = Tuple[int, int, int, int, int]
+
+
+def get_set_start_end_local(set_node: dict) -> Tuple[Optional[YMDHM], Optional[YMDHM]]:
+    """Get (start_ymdhm, end_ymdhm) in local time from a set's startedAt/completedAt."""
+    started = parse_iso(set_node.get("startedAt"))
+    completed = parse_iso(set_node.get("completedAt"))
+    if started and started.tzinfo is None:
+        started = started.replace(tzinfo=timezone.utc)
+    if completed and completed.tzinfo is None:
+        completed = completed.replace(tzinfo=timezone.utc)
+    local_tz = _local_tz()
+    if started:
+        lt = started.astimezone(local_tz)
+        start_ymdhm = (lt.year, lt.month, lt.day, lt.hour, lt.minute)
+    else:
+        start_ymdhm = None
+    if completed:
+        lt = completed.astimezone(local_tz)
+        end_ymdhm = (lt.year, lt.month, lt.day, lt.hour, lt.minute)
+    else:
+        end_ymdhm = None
+    return (start_ymdhm, end_ymdhm)
+
+
+def _local_ymdhm_to_utc(y: int, mo: int, d: int, h: int, mi: int) -> datetime:
+    """Build UTC datetime from local (year, month, day, hour, minute)."""
+    local_dt = datetime(y, mo, d, h, mi, 0, tzinfo=_local_tz())
+    return local_dt.astimezone(timezone.utc)
+
+
+def compute_cuts_from_selection(
+    selection: List[Tuple[dict, str, Optional[YMDHM], Optional[YMDHM]]],
+    recording_start: datetime,
+) -> List[Tuple[float, float, str]]:
+    """
+    selection: list of (set_node, custom_title, start_ymdhm, end_ymdhm).
+    start_ymdhm/end_ymdhm are (y, mo, d, h, mi) in local time, or None to use API timestamps.
+    """
+    out = []
+    for item in selection:
+        s, custom_title = item[0], item[1]
+        start_ymdhm = item[2] if len(item) > 2 else None
+        end_ymdhm = item[3] if len(item) > 3 else None
+        if start_ymdhm is not None and end_ymdhm is not None:
+            started = _local_ymdhm_to_utc(*start_ymdhm)
+            completed = _local_ymdhm_to_utc(*end_ymdhm)
+        else:
+            started = parse_iso(s.get("startedAt"))
+            completed = parse_iso(s.get("completedAt"))
+            if started is None or completed is None:
+                continue
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            if completed.tzinfo is None:
+                completed = completed.replace(tzinfo=timezone.utc)
+        start_sec = max(0.0, (started - recording_start).total_seconds())
+        end_sec = max(start_sec, (completed - recording_start).total_seconds())
+        title = (custom_title or "").strip() or "clip"
+        base = sanitize_filename(title)
+        out.append((start_sec, end_sec, base))
+    return out
+
+
 def export_cut_list_json(cuts: List[Tuple[float, float, str]], output_path: str, vod_path: str = ""):
     """Write cut list as JSON for use by other tools."""
     import json

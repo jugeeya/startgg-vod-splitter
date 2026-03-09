@@ -59,6 +59,10 @@ Output clips are written as `.mp4` (stream copy, no re-encode) in the folder you
 
 start.gg returns `startedAt` / `completedAt` in ISO 8601 (usually UTC). The app treats your **recording start** as the same timezone (or UTC). If you use **Use file time**, the file’s creation time is interpreted as UTC. If your recording PC uses local time, set **Recording start** manually to the correct UTC time (or same zone as the API) so cuts line up.
 
+## completedAt and duration warning
+
+On start.gg, **completedAt** can be updated when a set is edited later (e.g. character corrections). The API does not expose a separate “actual” completion time, so the app cannot fix this automatically. Each set row shows an uneditable **Duration** (start → end). If a duration is longer than 45 minutes, a red warning appears: *“Set too long; may have incorrect end time”* — adjust the set’s **End** date/time manually if the match was shorter, then click **Refresh durations** to update.
+
 ## Building the Windows exe
 
 To build a standalone `.exe` (no Python install needed on the target PC):

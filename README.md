@@ -31,11 +31,36 @@ The moment you hit `Submit Results`, start.gg takes that as the end time to be s
 These work out of the box! For the easiest experience, use the default OBS naming scheme that contains the timestamp, so you know for sure when the VOD started for use in the program later.
 
 ### One-Time Setup
-1) Install ffmpeg. On Windows, can just open Terminal and do `winget install ffmpeg`.
-2) Download the exe from releases: https://github.com/jugeeya/startgg-vod-splitter/releases
+1) Install ffmpeg. On Windows, can just open Terminal and do `winget install ffmpeg`. It may be better to restart your computer so you ensure it's in your PATH.
+
+<details><summary>If that doesn't work, click here for an alternative manual installation method:</summary>
+
+### Manual ffmpeg Installation
+
+- Go to https://ffmpeg.org/download.html.
+- Download the Windows build (static or shared).
+- Extract it to a location like `C:\ffmpeg`.
+
+#### Add to System Path
+- Press Win + X and select "System".
+- Click "Advanced system settings" (or search for "Environment Variables").
+- Click "Environment Variables" button (bottom right).
+- Under "System variables," select "Path" and click "Edit".
+- Click "New" and add the path to your FFmpeg bin folder (e.g, `C:\Users\computerusername\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.0.1-full_build\bin`)
+- Click OK on all dialogs.
+- Restart your computer (or restart your terminal/IDE).
+
+#### Verify that it worked
+- Open Command Prompt or Powershell.
+- Type `ffmpeg -version`. If it worked, it'll show version information.
+- Restart your computer.
+</details>
+<br>
+
+2) Download the `startgg-vod-splitter` exe from releases: https://github.com/jugeeya/startgg-vod-splitter/releases
 
 ### Workflow
-1) Open it, set "Event slug" to the event URL (after start.gg; example: `tournament/the-hangout-1-100-minimum-pot-bonus/event/rivals-of-aether-ii-singles`) and "Tournament Name" to your tournament's name (example: `The Hangout #1`).
+1) Open the app, set "Event slug" to the event URL (after start.gg; example: `tournament/the-hangout-1-100-minimum-pot-bonus/event/rivals-of-aether-ii-singles`) and "Tournament Name" to your tournament's name (example: `The Hangout #1`).
 2) Click `Fetch Sets`.
 3) Change the station dropdown to your station number (e.g. 3)
 4) Click `Choose VOD` and put the full OBS file.
@@ -44,7 +69,7 @@ These work out of the box! For the easiest experience, use the default OBS namin
 At this point, if you see:
 $\color{#f00}{\textsf{Set too long -- may have incorrect end time}}$
 
-Go into the vod and find the right end time and edit it. The start time will at least be correct so you can start there.
+Go into the vod and find the right duration and edit it. The start time will at least be correct so you can start there. In the VOD, you can usually see the current time in the top right for Rivals of Aether 2. If you update any times this way, click `Refresh Durations`.
 
 6) Click `Compute Cuts`. 
 7) Click `Split with ffmpeg` and choose an output folder.

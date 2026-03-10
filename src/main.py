@@ -70,7 +70,7 @@ def run_gui():
         frame_settings = ttk.Frame(root, padding=(12, 8))
     frame_settings.pack(fill="x", padx=12, pady=8)
 
-    ttk.Label(frame_settings, text="Event slug:").pack(side="left", padx=(0, 6))
+    ttk.Label(frame_settings, text="Event URL or slug:").pack(side="left", padx=(0, 6))
     slug_var = tk.StringVar(value="")
     slug_entry = ttk.Entry(frame_settings, textvariable=slug_var, width=55)
     slug_entry.pack(side="left", fill="x", expand=True, padx=4)
@@ -93,13 +93,24 @@ def run_gui():
         frame_fetch = ttk.Frame(root, padding=(12, 6))
     frame_fetch.pack(fill="x", padx=12, pady=6)
 
-    status_var = tk.StringVar(value="Enter event slug, then Fetch sets.")
+    status_var = tk.StringVar(value="Enter event URL or slug, then Fetch sets.")
 
     def fetch_sets():
-        slug = slug_var.get().strip()
-        if not slug:
-            status_var.set("Please enter event slug.")
+        user_input = slug_var.get().strip()
+        if not user_input:
+            status_var.set("Please enter event slug or URL.")
             return
+        
+        # Extract slug pattern: tournament/xxx/event/yyy from anywhere in the string
+        slug = user_input
+        import re
+        match = re.search(r'tournament/[^/\s]+/event/[^/\s]+', user_input)
+        if match:
+            slug = match.group(0)
+        elif user_input.startswith("http://") or user_input.startswith("https://"):
+            status_var.set("Invalid start.gg URL. Could not find tournament/event pattern.")
+            return
+        
         status_var.set("Fetching...")
         root.update_idletasks()
         try:
@@ -258,10 +269,20 @@ def run_gui():
             if not check_var.get():
                 continue
             title = title_var.get().strip() or startgg.set_display_name(set_node)
-            start_ymdhm = get_ymdhm(row_data[3], row_data[4], row_data[5])
-            end_ymdhm = get_ymdhm(row_data[6], row_data[7], row_data[8])
-            if start_ymdhm is not None and end_ymdhm is not None:
-                selection.append((set_node, title, start_ymdhm, end_ymdhm))
+            start_ymdhms = get_ymdhms(row_data[3], row_data[4], row_data[5], row_data[6])
+            # Get duration in minutes and seconds
+            try:
+                duration_min = int(row_data[7].get())
+                duration_sec = int(row_data[8].get())
+            except (ValueError, IndexError, AttributeError):
+                duration_min, duration_sec = 0, 0
+            # Calculate end time from start + duration
+            if start_ymdhms is not None and (duration_min > 0 or duration_sec > 0):
+                from datetime import datetime, timedelta
+                start_dt = datetime(*start_ymdhms)
+                end_dt = start_dt + timedelta(minutes=duration_min, seconds=duration_sec)
+                end_ymdhms = (end_dt.year, end_dt.month, end_dt.day, end_dt.hour, end_dt.minute, end_dt.second)
+                selection.append((set_node, title, start_ymdhms, end_ymdhms))
             else:
                 selection.append((set_node, title, None, None))
         if not selection:
@@ -288,22 +309,22 @@ def run_gui():
 
     DURATION_WARN_MINUTES = 45
 
-    def get_ymdhm(date_widget, h_var, m_var):
+    def get_ymdhms(date_widget, h_var, m_var, s_var):
         try:
             if hasattr(date_widget, "get_date"):
                 d = date_widget.get_date()
                 y, mo, day = d.year, d.month, d.day
             else:
                 # Plain Entry (used in set rows): .get() returns the date string
-                s = (date_widget.get() or "").strip()[:10]
-                if len(s) < 10:
+                s_str = (date_widget.get() or "").strip()[:10]
+                if len(s_str) < 10:
                     return None
                 from datetime import datetime
-                dt = datetime.strptime(s, "%Y-%m-%d")
+                dt = datetime.strptime(s_str, "%Y-%m-%d")
                 y, mo, day = dt.year, dt.month, dt.day
-            h, mi = int(h_var.get()), int(m_var.get())
-            if 0 <= h <= 23 and 0 <= mi <= 59:
-                return (y, mo, day, h, mi)
+            h, mi, sec = int(h_var.get()), int(m_var.get()), int(s_var.get())
+            if 0 <= h <= 23 and 0 <= mi <= 59 and 0 <= sec <= 59:
+                return (y, mo, day, h, mi, sec)
         except (ValueError, TypeError, AttributeError):
             pass
         return None
@@ -314,26 +335,26 @@ def run_gui():
             try:
                 if len(row_data) < 11:
                     continue
-                start_ymdhm = get_ymdhm(row_data[3], row_data[4], row_data[5])
-                end_ymdhm = get_ymdhm(row_data[6], row_data[7], row_data[8])
+                # Get the duration input values
+                duration_min_var = row_data[7]
+                duration_sec_var = row_data[8]
                 duration_label = row_data[9]
                 warn_label = row_data[10]
-                if start_ymdhm is None or end_ymdhm is None:
-                    duration_label.config(text="")
-                    warn_label.config(text="")
-                    continue
-                start_dt = datetime(*start_ymdhm)
-                end_dt = datetime(*end_ymdhm)
-                if end_dt <= start_dt:
+                try:
+                    duration_min = int(duration_min_var.get())
+                    duration_sec = int(duration_sec_var.get())
+                except (ValueError, AttributeError):
                     duration_label.config(text="(invalid)")
                     warn_label.config(text="")
                     continue
-                delta = end_dt - start_dt
-                total_sec = int(delta.total_seconds())
-                mins, secs = divmod(total_sec, 60)
-                duration_label.config(text=f"Duration: {mins}:{secs:02d}")
+                total_sec = duration_min * 60 + duration_sec
+                if total_sec <= 0:
+                    duration_label.config(text="(no duration)")
+                    warn_label.config(text="")
+                    continue
+                duration_label.config(text="")
                 if total_sec > DURATION_WARN_MINUTES * 60:
-                    warn_label.config(text=" — Set too long; may have incorrect end time", foreground="red")
+                    warn_label.config(text=" — Duration too long; verify it's correct", foreground="red")
                 else:
                     warn_label.config(text="", foreground="red")
             except Exception:
@@ -380,7 +401,7 @@ def run_gui():
         if not sets_for_station:
             ttk.Label(sets_inner, text=f"No sets with startedAt/completedAt for station {station_val or 'all'}.", foreground="gray").pack(anchor="w")
             return
-        from datetime import date
+        from datetime import date, datetime, timedelta
         for s in sets_for_station:
             name = startgg.set_display_name(s)
             round_text = (s.get("fullRoundText") or "").strip()
@@ -393,25 +414,29 @@ def run_gui():
                 default_title = f"{default_title} - {round_text}"
             check_var = tk.BooleanVar(value=True)
             title_var = tk.StringVar(value=default_title)
-            start_ymdhm, end_ymdhm = vod.get_set_start_end_local(s)
-            if start_ymdhm:
-                sy, smo, sd, sh, smi = start_ymdhm
+            start_ymdhms, end_ymdhms = vod.get_set_start_end_local(s)
+            if start_ymdhms:
+                sy, smo, sd, sh, smi, ss = start_ymdhms
                 start_date_default = date(sy, smo, sd)
                 start_h_var = tk.StringVar(value=str(sh))
                 start_m_var = tk.StringVar(value=str(smi))
+                start_s_var = tk.StringVar(value=str(ss))
             else:
                 start_date_default = date.today()
                 start_h_var = tk.StringVar(value="0")
                 start_m_var = tk.StringVar(value="0")
-            if end_ymdhm:
-                ey, emo, ed, eh, emi = end_ymdhm
-                end_date_default = date(ey, emo, ed)
-                end_h_var = tk.StringVar(value=str(eh))
-                end_m_var = tk.StringVar(value=str(emi))
-            else:
-                end_date_default = date.today()
-                end_h_var = tk.StringVar(value="0")
-                end_m_var = tk.StringVar(value="0")
+                start_s_var = tk.StringVar(value="0")
+            # Calculate duration from API start and end times if available
+            duration_min_default = 0
+            duration_sec_default = 0
+            if start_ymdhms and end_ymdhms:
+                start_dt = datetime(*start_ymdhms)
+                end_dt = datetime(*end_ymdhms)
+                delta = end_dt - start_dt
+                total_sec = int(delta.total_seconds())
+                duration_min_default, duration_sec_default = divmod(max(0, total_sec), 60)
+            duration_m_var = tk.StringVar(value=str(duration_min_default))
+            duration_s_var = tk.StringVar(value=str(duration_sec_default))
             row = ttk.Frame(sets_inner)
             row.pack(fill="x", pady=2)
             cb = ttk.Checkbutton(row, variable=check_var)
@@ -420,7 +445,6 @@ def run_gui():
             ent.pack(side="left", padx=(0, 6))
             # Use plain Entry for dates in the scrollable list — DateEntry's dropdown freezes inside a Canvas
             start_date_str = start_date_default.strftime("%Y-%m-%d")
-            end_date_str = end_date_default.strftime("%Y-%m-%d")
             ttk.Label(row, text="Start:").pack(side="left", padx=(0, 2))
             start_date_entry = ttk.Entry(row, width=10)
             start_date_entry.insert(0, start_date_str)
@@ -430,20 +454,20 @@ def run_gui():
             ttk.Label(row, text=":").pack(side="left")
             start_m_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=start_m_var)
             start_m_spin.pack(side="left", padx=1)
-            ttk.Label(row, text="End:").pack(side="left", padx=(4, 2))
-            end_date_entry = ttk.Entry(row, width=10)
-            end_date_entry.insert(0, end_date_str)
-            end_date_entry.pack(side="left", padx=2)
-            end_h_spin = ttk.Spinbox(row, from_=0, to=23, width=2, textvariable=end_h_var)
-            end_h_spin.pack(side="left", padx=1)
             ttk.Label(row, text=":").pack(side="left")
-            end_m_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=end_m_var)
-            end_m_spin.pack(side="left", padx=1)
+            start_s_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=start_s_var)
+            start_s_spin.pack(side="left", padx=1)
+            ttk.Label(row, text="Duration:").pack(side="left", padx=(4, 2))
+            duration_m_spin = ttk.Spinbox(row, from_=0, to=999, width=4, textvariable=duration_m_var)
+            duration_m_spin.pack(side="left", padx=1)
+            ttk.Label(row, text=":").pack(side="left")
+            duration_s_spin = ttk.Spinbox(row, from_=0, to=59, width=2, textvariable=duration_s_var)
+            duration_s_spin.pack(side="left", padx=1)
             duration_label = ttk.Label(row, text="")
             duration_label.pack(side="left", padx=(8, 2))
             warn_label = ttk.Label(row, text="", foreground="red")
             warn_label.pack(side="left", padx=2)
-            sets_ui_rows.append((s, check_var, title_var, start_date_entry, start_h_var, start_m_var, end_date_entry, end_h_var, end_m_var, duration_label, warn_label))
+            sets_ui_rows.append((s, check_var, title_var, start_date_entry, start_h_var, start_m_var, start_s_var, duration_m_var, duration_s_var, duration_label, warn_label))
         update_durations()
 
     # --- Cuts list ---

@@ -117,12 +117,12 @@ def compute_cuts(
     return out
 
 
-# (year, month, day, hour, minute) in local time
-YMDHM = Tuple[int, int, int, int, int]
+# (year, month, day, hour, minute, second) in local time
+YMDHMS = Tuple[int, int, int, int, int, int]
 
 
-def get_set_start_end_local(set_node: dict) -> Tuple[Optional[YMDHM], Optional[YMDHM]]:
-    """Get (start_ymdhm, end_ymdhm) in local time from a set's startedAt/completedAt."""
+def get_set_start_end_local(set_node: dict) -> Tuple[Optional[YMDHMS], Optional[YMDHMS]]:
+    """Get (start_ymdhms, end_ymdhms) in local time from a set's startedAt/completedAt."""
     started = parse_iso(set_node.get("startedAt"))
     completed = parse_iso(set_node.get("completedAt"))
     if started and started.tzinfo is None:
@@ -132,39 +132,39 @@ def get_set_start_end_local(set_node: dict) -> Tuple[Optional[YMDHM], Optional[Y
     local_tz = _local_tz()
     if started:
         lt = started.astimezone(local_tz)
-        start_ymdhm = (lt.year, lt.month, lt.day, lt.hour, lt.minute)
+        start_ymdhms = (lt.year, lt.month, lt.day, lt.hour, lt.minute, lt.second)
     else:
-        start_ymdhm = None
+        start_ymdhms = None
     if completed:
         lt = completed.astimezone(local_tz)
-        end_ymdhm = (lt.year, lt.month, lt.day, lt.hour, lt.minute)
+        end_ymdhms = (lt.year, lt.month, lt.day, lt.hour, lt.minute, lt.second)
     else:
-        end_ymdhm = None
-    return (start_ymdhm, end_ymdhm)
+        end_ymdhms = None
+    return (start_ymdhms, end_ymdhms)
 
 
-def _local_ymdhm_to_utc(y: int, mo: int, d: int, h: int, mi: int) -> datetime:
-    """Build UTC datetime from local (year, month, day, hour, minute)."""
-    local_dt = datetime(y, mo, d, h, mi, 0, tzinfo=_local_tz())
+def _local_ymdhms_to_utc(y: int, mo: int, d: int, h: int, mi: int, s: int = 0) -> datetime:
+    """Build UTC datetime from local (year, month, day, hour, minute, second)."""
+    local_dt = datetime(y, mo, d, h, mi, s, tzinfo=_local_tz())
     return local_dt.astimezone(timezone.utc)
 
 
 def compute_cuts_from_selection(
-    selection: List[Tuple[dict, str, Optional[YMDHM], Optional[YMDHM]]],
+    selection: List[Tuple[dict, str, Optional[YMDHMS], Optional[YMDHMS]]],
     recording_start: datetime,
 ) -> List[Tuple[float, float, str]]:
     """
-    selection: list of (set_node, custom_title, start_ymdhm, end_ymdhm).
-    start_ymdhm/end_ymdhm are (y, mo, d, h, mi) in local time, or None to use API timestamps.
+    selection: list of (set_node, custom_title, start_ymdhms, end_ymdhms).
+    start_ymdhms/end_ymdhms are (y, mo, d, h, mi, s) in local time, or None to use API timestamps.
     """
     out = []
     for item in selection:
         s, custom_title = item[0], item[1]
-        start_ymdhm = item[2] if len(item) > 2 else None
-        end_ymdhm = item[3] if len(item) > 3 else None
-        if start_ymdhm is not None and end_ymdhm is not None:
-            started = _local_ymdhm_to_utc(*start_ymdhm)
-            completed = _local_ymdhm_to_utc(*end_ymdhm)
+        start_ymdhms = item[2] if len(item) > 2 else None
+        end_ymdhms = item[3] if len(item) > 3 else None
+        if start_ymdhms is not None and end_ymdhms is not None:
+            started = _local_ymdhms_to_utc(*start_ymdhms)
+            completed = _local_ymdhms_to_utc(*end_ymdhms)
         else:
             started = parse_iso(s.get("startedAt"))
             completed = parse_iso(s.get("completedAt"))

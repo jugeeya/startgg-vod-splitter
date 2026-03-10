@@ -2,6 +2,8 @@
 
 Small desktop app for turning a VOD into per-set clips using start.gg set times. Use one PC/station per run: pick the event, station number, and VOD file, and the app will compute cut times and can split into output video files automatically with video titled filenames!
 
+![Usage](./img/usage.png)
+
 ## Usage
 
 This tool can work very well for either single-stream/recording setups, or even multi-recording setups! We created this for use at our monthly SoCal series [The Hangout](start.gg/thehangout), which currently has 4 recording setups, in order to support recording all winner's side and top 8 sets. 

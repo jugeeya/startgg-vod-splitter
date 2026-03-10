@@ -1,17 +1,55 @@
 # Start.gg VOD Splitter
 
-Small desktop app for turning a **full-station VOD** (e.g. from OBS) into **per-set clips** using start.gg set times. Use one PC/station per run: pick the event, station number, and VOD file; the app computes cut times and can export a cut list (CSV/JSON) or split the file with ffmpeg.
+Small desktop app for turning a VOD into per-set clips using start.gg set times. Use one PC/station per run: pick the event, station number, and VOD file, and the app will compute cut times and can split into output video files automatically with video titled filenames!
 
-Works on **Windows, macOS, and Linux** (Python 3.10+).
+## Usage
 
-**macOS (Homebrew):** If you get `No module named '_tkinter'`, install Tk support for your Python version, then try again:
-```bash
-brew install python-tk@3.14   # match your Python version, e.g. 3.11 → python-tk@3.11
-```
-If that formula doesn’t exist, install `tcl-tk` and reinstall Python: `brew install tcl-tk` then `brew reinstall python@3.14`.
+This tool can work very well for either single-stream/recording setups, or even multi-recording setups! We created this for use at our monthly SoCal series [The Hangout](start.gg/thehangout), which currently has 4 recording setups, in order to support recording all winner's side and top 8 sets. 
 
-## Quick start
+### What To Do During Your Tournament
 
+The overall idea for this tool is to automate VOD splitting by moving the VOD marking process instead to the ***start.gg match result submission time.*** If you can be somewhat disciplined with this portion, you can save yourself a lot of time splitting the vod after the tournament is over!
+
+#### Tournament Workflow / Notes
+1) **Use start.gg's `Start Match` exactly when you call the match OR as close to true match start as possible.** start.gg will store this start time in its database for use in the splitter program later. If you do it when you call the match initially, you'll have some initial headroom in the video for however long it takes the players to start the game, but it's easier as an organizer who can't watch for exactly when it starts.
+2) **When a match ends, submit results ONLY once you have confirmed all of the following information:**
+  - Game count is correct
+  - Character data is correct
+  - Station number is correct
+
+The moment you hit `Submit Results`, start.gg takes that as the end time to be stored in its database to be used as the end time for your split vod later. The reason it is important to get the above information *before* is that if those are updated afterwards, the end time for the set is also updated on start.gg. If you must do this, you will likely run into the `Set too long` warning listed below, where you'll simply have to manually set the end time or duration of that set.
+
+### Recording Types
+
+#### Twitch VODs
+- I use [Twitch VOD Downloader](https://chromewebstore.google.com/detail/twitch-vod-downloader/gaabmdjigfcnkgeommfpnoinpdmpfhaj?hl=en) to get a `.chunked.ts` file to work with. Its UI also gives the start time of the VOD.
+- `ffmpeg -i in.ts -c copy out.mp4`: Turn a Twitch VOD chunked file into a file compatible with this program.
+
+#### OBS Recordings
+These work out of the box! For the easiest experience, use the default OBS naming scheme that contains the timestamp, so you know for sure when the VOD started for use in the program later.
+
+### One-Time Setup
+1) Install ffmpeg. On Windows, can just open Terminal and do `winget install ffmpeg`.
+2) Download the exe from releases: https://github.com/jugeeya/startgg-vod-splitter/releases
+
+### Workflow
+1) Open it, set "Event slug" to the event URL (after start.gg; example: `tournament/the-hangout-1-100-minimum-pot-bonus/event/rivals-of-aether-ii-singles`) and "Tournament Name" to your tournament's name (example: `The Hangout #1`).
+2) Click `Fetch Sets`.
+3) Change the station dropdown to your station number (e.g. 3)
+4) Click `Choose VOD` and put the full OBS file.
+5) It'll pre-fill "Recording start", but if it doesn't match the OBS filename hour:minutes:seconds, change it to match the filename! You'll likely need to do this.
+
+At this point, if you see:
+$\color{#f00}{\textsf{Set too long -- may have incorrect end time}}$
+
+Go into the vod and find the right end time and edit it. The start time will at least be correct so you can start there.
+
+6) Click `Compute Cuts`. 
+7) Click `Split with ffmpeg` and choose an output folder.
+
+## Development
+
+### Environment Setup
 1. **Install Python 3.10+** and create a virtualenv (recommended):
    ```bash
    python3 -m venv .venv
@@ -23,45 +61,6 @@ If that formula doesn’t exist, install `tcl-tk` and reinstall Python: `brew in
 2. **Run the app**
    - **macOS / Linux:** From project root, `python3 -m src.main` (or `./run.sh`).
    - **Windows:** From project root in Command Prompt or PowerShell: `py -3 -m src.main` or `python -m src.main`. Or double‑click `run.bat` (after installing Python and dependencies).
-
-3. **Workflow**
-   - Enter **event slug** (e.g. `tournament/joshu-s-test-tourney/event/rivals-of-aether-ii-singles`). (No API token needed — the app uses the same public endpoint as the start.gg site.)
-   - Click **Fetch sets** to load the event from start.gg.
-   - Choose **Station** (the station number for this VOD).
-   - Click **Choose VOD…** and select your full recording file.
-   - Click **Use file time** to fill recording start from the file’s creation time (or type an ISO time in **Recording start** if you need to override).
-   - Click **Compute cuts** to see the list of segments.
-   - **Export cut list (CSV/JSON)** for use in Lossless Cut or other tools, or **Split with ffmpeg** to generate one clip per set (requires [ffmpeg](https://ffmpeg.org/) in PATH).
-
-## Running on Windows
-
-- Install Python from [python.org](https://www.python.org/downloads/) (check “Add Python to PATH”).
-- Open Command Prompt or PowerShell in the project folder, then:
-  ```bat
-  py -3 -m venv .venv
-  .venv\Scripts\activate
-  pip install -r requirements.txt
-  python -m src.main
-  ```
-- Or run `run.bat` (tries `py -3` then `python`). If the window closes with an error, open it from Command Prompt so you can see the message.
-
-## Optional: ffmpeg
-
-For **Split with ffmpeg**, install ffmpeg and ensure it’s on your PATH:
-
-- **Windows**: e.g. [ffmpeg releases](https://www.gyan.dev/ffmpeg/builds/) or `winget install ffmpeg`
-- **macOS**: `brew install ffmpeg`
-- **Linux**: `sudo apt install ffmpeg` / `sudo dnf install ffmpeg`
-
-Output clips are written as `.mp4` (stream copy, no re-encode) in the folder you choose.
-
-## Time zones
-
-start.gg returns `startedAt` / `completedAt` in ISO 8601 (usually UTC). The app treats your **recording start** as the same timezone (or UTC). If you use **Use file time**, the file’s creation time is interpreted as UTC. If your recording PC uses local time, set **Recording start** manually to the correct UTC time (or same zone as the API) so cuts line up.
-
-## completedAt and duration warning
-
-On start.gg, **completedAt** can be updated when a set is edited later (e.g. character corrections). The API does not expose a separate “actual” completion time, so the app cannot fix this automatically. Each set row shows an uneditable **Duration** (start → end). If a duration is longer than 45 minutes, a red warning appears: *“Set too long; may have incorrect end time”* — adjust the set’s **End** date/time manually if the match was shorter, then click **Refresh durations** to update.
 
 ## Building the Windows exe
 

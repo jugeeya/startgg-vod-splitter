@@ -21,6 +21,8 @@ The overall idea for this tool is to automate VOD splitting by moving the VOD ma
 
 The moment you hit `Submit Results`, start.gg takes that as the end time to be stored in its database to be used as the end time for your split vod later. The reason it is important to get the above information *before* is that if those are updated afterwards, the end time for the set is also updated on start.gg. If you must do this, you will likely run into the `Set too long` warning listed below, where you'll simply have to manually set the end time or duration of that set.
 
+![Tournament Workflow](./img/tournament-workflow.png)
+
 ### Recording Types
 
 #### Twitch VODs
